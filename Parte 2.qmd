@@ -56,63 +56,69 @@ options(OutDec=",")
 #| echo: false
 #| warning: false
 
-## Dados 1 - Import ----
+## Dados 2 - Import ----
 
-dados <- stackloss
+dados2 <- faraway::prostate
 
 ### Arrumação ----
-dados <- dados|>
+dados2 <- dados2|>
   janitor::clean_names()
-
-# Transformando as variaveis e mudando as unidades de medida.
-dados1 <- dados|>
-  mutate(
-    acid_conc = acid_conc/10+50,
-    stack_loss = stack_loss/10
-  )
+dados2 <- dados2 %>% mutate(svi = svi*100)
 ```
 
 
 # Apresentação
 
-O relatório desta semana está dividido em duas atividades. Na primeira foi analisado um banco de dados sobre uma industria que realiza a oxidação de amônia, para o qual por meio de técnicas de regressão linear múltipla se elaborou um modelo para determinar a perda de amônia no processo. Na segunda atividade, se buscou determinar a quantidade de água perdida do solo, evaporação do solo, com base em mum banco de dados sobre propriedades do solo e do ar associadas. Nesta segunda atividade também foram utilizadas técnicas de regressão linear múltipla.
+O relatório desta semana está dividido em duas atividades. Na segunda atividade, se buscou determinar a o melhor modelo para determinar o PSA de pacientes com câncer de próstata, utilizando técnicas de colinearidade das variáveis de regressão linear múltipla.
 
 # Atividade 1
 
+
+# Atividade 2
 ## Introdução
-Com base nos dados disponibilizados no *dataset* "stackloss" (do R base), que apresenta dados de 21 dias de operação de um indústria que realiza oxidação de amônia ($NH_3$) em ácido nítrico ($HNO_3$). O ácido nítrico produzido é absorvido na torre de absorção contracorrente. As informações disponíveis na base de dados referem-se a:  
+Com base nos dados disponibilizados no *dataset* "prostate" (do pacote *faraway*), que apresenta dados referentes ao câncer de prostata de 97 pacientes, cujo objetivo foi identificar os pacientes com indicação de prostatectomia tooal. As informações disponíveis na base de dados referem-se a:  
 
 ::: incrementyal
-- **Air fow**: que representa a taxa de operação da indústria (corrente de ar refrigerado);  
-- **Water Temp**: é a temperatura de resfriamento da água que circula nos canos da torre de absorção;  
-- **Acid.Conc.**: é a concentração do ácido [em porcentagem, após tratamento]; e  
-- **stack.loss** (variável dependente) é o percentual (após tratamento) de amônia introduzida no processo industrial que escapa da absorção (representando uma medida(inversa) de eficiência total da indústria).  
+- **lcavol**: é o volume do câncer (logarírimo);  
+- **lweight**: é o peso (massa) da próstata (logarítimo);  
+- **age**: é a idade do paciente (anos);    
+- **lbph**: é a quantidade de hiperplasia benigna na próstata (logarítimo);  
+- **svi**: é a invasão da vesícula seminal (porcentagem);  
+- **icp**: é a penetralção capsular(logarítimico);  
+- **gleason**: é o Índice de Gleason;  
+- **pgg45**: é a porcentagem do Índice de Gleason de valor 4 ou 5 (porcentagem);  
+- **lpsa**: é o valor do PSA (logarítimico);  
 :::
+
+**Fonte: Andrews, D.F.; Herzberg, A.M. (1985): Data. New York: Springer-Verlag.**
 
 Com base nestes dados, objetiva-se:
 
 
-1. Ajustar um modelo linear múltiplo completo para estes dados. Avaliando as estimativas dos parâmetros, os resíduos e a influência das observações no ajuste do modelo, incluindo leverage, distância de Cook, DFBETAs, DFFITs e COVRATIOs.  
-
-2. Avaliar a partir de regressão parcial e dos resíduos parciais as variáveis no modelo, bem como o pressuposto de normalidade do resíduos.
+Utilizar os métodos R², backward e stepward (Akaike e Bayesiano) como métodos de seleção de covariáveis para determinar o "melhor" ajuste de um modelo de regressão linear múltiplo.  
 
 ## Resultados
 
 ### Análise descritiva dos dados
 
-É possivel realizar uma descrição prévia dos dados por meio de medidas de resumo e de gráficos do tipo box-plot como vê-se a seguir:
+É possivel realizar uma descrição prévia dos dados por meio de medidas de resumo e da matriz de correlação como vê-se a seguir:
 
 
 ```{r tab1:MedRes}
 #| echo: false
 #| warning: false
 
-dados1|>
+dados2|>
   rename(
-    "Fluxo de Ar" = air_flow,
-    "Temperatura da Água" = water_temp,
-    "Concentração de HNO3" = acid_conc,
-    "Amônia Perdida" = stack_loss
+    "Volume do Câncer" = lcavol,
+    "Peso da Próstata" = lweight,
+    "Idade" = age,
+    "Hiperplasia Benigna" = lbph,
+    "Invasão da Vesicular" = svi,
+    "Penetralção Capsular" = lcp,
+    "Índice de Gleason" = gleason,
+    "Índice de Gleason de valor 4 ou 5" = pgg45,
+    "PSA" = lpsa,
   )|>
   summarytools::descr(
     stats = c("min", "q1", "med", "mean","q3", "max",  "sd", "cv", "Skewness", "Kurtosis"),
@@ -137,71 +143,168 @@ dados1|>
   kable_material()
 ```
 
+Como os valores analisados de diversas variáveis é obtido a partir do logarítimo dos valores reais destas variáveis observa-se na Tabela 1 alguns valores negatívos sem que isso corresponda a valores impossíveis. 
 
+\newpage 
 
-```{r fig3:BoxPlot2}
+**Figura 1: Correlograma das variáveis dos dados.**
+
+```{r fig1:cor}
 #| echo: false
 #| warning: false
-#| fig-height: 4.5
-#| fig-width: 6
+#| fig-height: 7
+#| fig-width: 7
 
-# BoxPlot ----
+# Matriz de Correlação ----
+panel.cor <- function(x, y, digits = 2, prefix = "", cex.cor, ...)
 {
-## b1 volume de ar----
-b1 <- dados1|>
-  ggplot(aes(y = air_flow)) +
-  geom_boxplot(col="darkblue", fill="skyblue", alpha = 0.5)+
-  labs(
-    title = "Fluxo de Ar",
-    x = "",
-    y = "m³"
-  )+theme_minimal(base_size = 7.5)
-
-## b2 Temperatura da água ----
-b2 <- dados1|>
-  ggplot(aes(y = water_temp)) +
-  geom_boxplot(col="darkblue", fill="skyblue", alpha = 0.5)+
-  labs(
-    title = "Temperatura da Água",
-    x = "",
-    y = "ºC"
-  )+theme_minimal(base_size = 7.5)
-
-## b3 Concentração de HNO_3 ----
-b3 <- dados1|>
-  ggplot(aes(y = acid_conc)) +
-  geom_boxplot(col="darkblue", fill="skyblue", alpha = 0.5)+
-  labs(
-    title = "Concentração de HNO3",
-    x = "",
-    y = "g/L"
-  )+theme_minimal(base_size = 7.5)
-
-## b4 Perda ----
-b4 <- dados1|>
-  ggplot(aes(y = stack_loss)) +
-  geom_boxplot(col="darkblue", fill="skyblue", alpha = 0.5)+
-  labs(
-    title = "Amônia Perdida",
-    x = "",
-    y = "Porcentagem"
-  )+theme_minimal(base_size = 7.5)
-
-b1 + b2 + b3 + b4 + 
-  plot_layout(ncol = 2) + 
-  plot_annotation(
-    title = "Figura 1: BoxPlot das variáveis em análise.",
-    tag_levels = c("A", "2"))&
-   theme(
-     legend.position = "none",
-     plot.tag.position = c(1, 0),
-     plot.tag = element_text(size = 12, hjust = 1, vjust = -2.2)
-   )
+  usr <- par("usr"); on.exit(par(usr))
+  par(usr = c(0, 1, 0, 1))
+  r <- abs(cor(x, y))
+  txt <- format(c(r, 0.123456789), digits = digits)[1]
+  txt <- paste0(prefix, txt)
+  if(missing(cex.cor)) cex.cor <- 0.8/strwidth(txt)
+  text(0.5, 0.5, txt, cex = cex.cor * r)
 }
-
+panel.lm <- function (x, y, col = par("col"), bg = NA, pch = par("pch"), 
+    cex = 1, col.line="tomato") {
+    points(x, y, pch = pch, col = col, bg = bg, cex = cex)
+    ok <- is.finite(x) & is.finite(y)
+    if (any(ok)) {
+       abline(lm(y[ok]~x[ok]), col = col.line)
+    }
+}
+panel.hist <- function(x, ...)
+{
+  usr <- par("usr"); on.exit(par(usr))
+  par(usr = c(usr[1:2], 0, 1.5) )
+  h <- hist(x, plot = FALSE)
+  breaks <- h$breaks; nB <- length(breaks)
+  y <- h$counts; y <- y/max(y)
+  rect(breaks[-nB], 0, breaks[-1], y, col = "tomato", ...)
+}
+pairs(dados2, diag.panel = panel.hist, upper.panel = panel.cor,
+      lower.panel = panel.lm)
 ```
 
-Nota-se uma assimetria nos dados apresentados e algumas observações que podem ser descritas como *outliers*. Entretanto é possivel propor um modelo de regressão como se segue.
+Os diagramas de dispersão da Figura 1, aparentemente há uma
+baixa relação linear entre diversos pares de variáveis, o que indica a princípio uma menor colinearidade entre elas. A análise doo coeficiente de correlação de pearson revela que o volume do câncer é a variável com maior correlação com o PSA (variável resposta) e que há uma forte colinearidade entre as duas variáveis que avaliam o Índice de Gleason, como esperado.
 
 
+### Modelo de Regressão Linear Múltipla  
+
+O modelo de regressão múltipla obtido pode ser representado por:
+
+```{r }
+#| echo: false
+#| warning: false
+
+n <- as.numeric(length(dados2$lpsa))
+Y <- as.matrix(dados2$lps)
+X <- as.matrix(dados2[,-9])
+X <- cbind(1,X)
+betas <- (solve(t(X) %*% X)) %*% t(X) %*% Y
+H = X %*% (solve(t(X) %*% X)) %*% t(X)
+J <- matrix(1,n,n)
+SQRes <- t(Y) %*% Y - t(betas) %*% t(X) %*% Y
+SQReg <- t(betas) %*% t(X) %*% Y - (1/n)*t(Y) %*% J %*% Y
+SQTot <- SQReg + SQRes
+
+R2 <- round(SQReg/SQTot,3)
+R2_aju <- round(1 - (SQRes/(n - 10))/(SQTot/(n -1)),3)
+```
+
+
+$Y_{i}=$`r round(betas[1],3)` $+$ `r round(betas[2],3)` $X_{1i} +$ `r round(betas[3],3)` $X_{2i}$ `r round(betas[4],3)` $X_{3i}+$ `r round(betas[5],3)` $X_{4i}+$ `r round(betas[6],3)` $X_{5i}$ `r round(betas[7],3)` $X_{6i}+$ `r round(betas[8],3)` $X_{7i}+$ `r round(betas[9],3)` $X_{8i}$ 
+
+Onde:    
+$Y_{i}$ - PSA;  
+$X_{1i}$ - Volume do Câncer;  
+$X_{2i}$ - Peso da Próstata;  
+$X_{3i}$ - Idade;  
+$X_{4i}$ - Hiperplasia Benigna;  
+$X_{5i}$ - Invasão da Vesicular;  
+$X_{6i}$ - Penetralção Capsular;  
+$X_{7i}$ - Índice de Gleason;  
+$X_{8i}$ - Índice de Gleason de valor 4 ou 5;  
+
+
+
+Interpretando-se o modelo pode-se dizer que para cada variável, fixadas as demais condições (_Ceteris Paribus_), o valor do PSA: aumenta em 0,587 para cada unidade do volume do câncer; aumenta em 0,454 para cada unidade do peso da próstata; reduz em 0,02 a cada ano do paciente; aumenta em 0,107 a cada unidade de hiperplasia benigna, aumenta em 0,008 a cada unidade d e invasão vesicular, reduz em 0,105 a cada unidade de penetração capsular; aumneta em 0,045 a cada unidade do índice de Gleason; e aumenta 0,005 a cada unidade porcentual do índice de Gleason entre 4 e 5. Neste modelo o coeficiente de determinação calculado foi de $R^2=$ `r R2`, o que denota que `r R2*100`% da variância dos dados é explicada pelo modelo. Pode-se calcular o coeficiente de determinação ajustado igual a $R^2_a=$ `r R2_aju`.  
+
+
+```{r teste_diag_trans}
+#| echo: false
+#| warning: false
+
+
+## Modelo
+m2 <- lm(lpsa ~ lcavol + lweight + age + lbph + svi + lcp + gleason + pgg45, data = dados2)
+
+resultados <- cbind(confint(m2))
+rownames(resultados) <- c("$\\hat \\beta_0$", "$\\hat \\beta_1$", "$\\hat \\beta_2$", "$\\hat \\beta_3$","$\\hat \\beta_4$","$\\hat \\beta_5$","$\\hat \\beta_6$", "$\\hat \\beta_7$", "$\\hat \\beta_8$")
+
+resultados|>
+  kbl(
+    caption = "Intervalos de Confiança para os parâmetros estimados no MRLS.",
+    format.args=list(big.mark=".", decimal.mark=","),
+    digits = 3, align = "c", row.names = T, booktabs = T,
+    escape = F,
+    col.names = c("$LI^1$", "$LS^2$")
+  )|>
+  kable_styling(
+    full_width = F, position = 'center', 
+    latex_options = c("striped", "HOLD_position", "repeat_header")
+  )|>
+  column_spec(1, bold = T
+  )|>
+    footnote(
+    symbol = "Nível de Significância de 5%.",
+    symbol_title = "",
+    footnote_as_chunk = T
+  )|>
+    footnote(
+    number = c(
+      "LI: Limite Inferior (2,5%)", 
+      "LS: Limite Superior (97,5%)"),
+    number_title = "Legenda:",
+    footnote_as_chunk = F
+  )|>
+  kable_material()
+```
+A Tabela 2 apresenta os intervalos de confiança calculados os coeeficientes da equação acima com 95% de confiança.
+
+## Seleçâo de Modelo
+
+As seleções de modelo foram realizadas por meio do pacote `olsrr` da linguagem R.
+
+```{r}
+#| echo: false
+#| warning: false
+
+sel_back <- olsrr::ols_step_backward_p(m2)
+sel_step <- olsrr::ols_step_both_p(m2)
+sel_R2 <- olsrr::ols_step_best_subset(m2)
+```
+
+### Eliminação backward baseada no teste F
+
+Por meio da função `ols_step_backward_p()` verificou-se a possibilidade de eliminação de variáveis com base no teste F. Após os cálculos verificou-se que a variável: "Índice de Gleason" foi descartada do modelo. Gerando um modelo com $R^2 =$ `r round(sel_back$rsquare,3)` e um $R^2_{aju} =$ `r round(sel_back$adjr,3)`.
+
+
+### Seleção stepwise baseada no critério de informação de Akaike
+Por meio da função `ols_step_both_p()` verificou-se a possibilidade de inclusão de variáveis com base no critério de informação de Akaine. Após os cálculos verificou-se que as variáveis: "Volume do Câncer", "Peso da Próstata" e "Invasão Vesicular" são as que melhor descrevem o modelo por esse critério. Gerando um modelo com $R^2 =$ `r round(sel_back$rsquare,3)` e um $R^2_{aju} =$ `r round(sel_back$adjr,3)`.
+
+### Seleção stepwise baseada no critério de informação Bayesiano
+Por meio da função `ols_step_both_p()` verificou-se a possibilidade de inclusão de variáveis com base no critério de informação Bayesiano. Após os cálculos verificou-se o mesmo resultado que com o critério de informação de Akaine, logo o modelo com $R^2 =$ `r round(sel_back$rsquare,3)` e um $R^2_{aju} =$ `r round(sel_back$adjr,3)`.
+
+
+### Todas as regressões possíveis, baseado no R2 ajustado
+
+Por meio da função `ols_step_best_subset()`, utilizando-se o critério baseado no coeficiente de determinação ou do coeficiente de determinação ajustado, verificou-se que o modelo com todas as variáveis é o que melhor explica a variável "PSA". Entretanto o ganho de *performance* com o aumento do número de variáveis não justifica o aumento da complexidade do modelo. Verificou-se que o aumento de uma nova variável partindo-se do modelo obtido na seleção pelo critério *stepwise* obteve ou ganho de menos de 1% de explicação da variância da variável resposta. Desta forma, o modelo que utiliza apenas as variáveis "Volume do Câncer", "Peso da Próstata" e "Invasão Vesicular" parece ser melhor que todos os demais.
+
+
+## Conclusão
+
+A utilização de diversos critérios para otimizar o modelo de regressão linear múltipla avaliado, permite verificar que por mais de um critério pode se chegar a um mesmo modelo de explicação do PSA de pacientes com câncer na próstada, qual seja, aquele baseado tão somente nas variáveis "Volume do Câncer", "Peso da Próstata" e "Invasão Vesicular" já que este parece ser melhor que todos os demais modelos testados.
 
