@@ -1,0 +1,207 @@
+---
+title: "Seleção de Modelos de Regressão - Parte 2"
+author: "Fernado Bispo, Jeff Caponero"
+format:
+    pdf:
+      toc: true
+      toc-title: Sumário
+      colorlinks: true
+      documentclass: report
+      papersize: letter
+      number-sections: false
+      geometry:
+        - top=30mm
+        - left=30mm
+        - right=20mm
+        - bottom=20mm
+        - heightrounded
+      fig-pos: "H"
+      fig-align: center
+      lang: pt-BR
+      # fontfamily: libertinus
+      fontsize: 12pt
+      include-in-header:
+      - text: |
+          \usepackage{caption}
+          \usepackage{fontspec}
+          \usepackage{xcolor}
+          \usepackage{indentfirst}
+          \captionsetup[table]{name=Tabela}
+---
+
+```{r pacotes}
+#| echo: false
+#| warning: false
+
+
+# PACOTES ----
+
+if (!require(pacman)) install.packages("pacman")
+
+pacman::p_load(tidyverse,  janitor, stargazer,  sjmisc, summarytools,
+               kableExtra, moments, ggpubr, formattable, gridExtra, 
+               glue, corrplot, sessioninfo, readxl, writexl, ggthemes,
+               patchwork,  plotly, lmtest, olsrr, gglm, ggplot2, rigr,
+               tidymodels, GGally, skimr, performance, gtsummary)
+
+
+
+summarytools::st_options(lang = "pt")
+options(OutDec=",") 
+
+``` 
+
+
+```{r dados1}
+#| echo: false
+#| warning: false
+
+## Dados 1 - Import ----
+
+dados <- stackloss
+
+### Arrumação ----
+dados <- dados|>
+  janitor::clean_names()
+
+# Transformando as variaveis e mudando as unidades de medida.
+dados1 <- dados|>
+  mutate(
+    acid_conc = acid_conc/10+50,
+    stack_loss = stack_loss/10
+  )
+```
+
+
+# Apresentação
+
+O relatório desta semana está dividido em duas atividades. Na primeira foi analisado um banco de dados sobre uma industria que realiza a oxidação de amônia, para o qual por meio de técnicas de regressão linear múltipla se elaborou um modelo para determinar a perda de amônia no processo. Na segunda atividade, se buscou determinar a quantidade de água perdida do solo, evaporação do solo, com base em mum banco de dados sobre propriedades do solo e do ar associadas. Nesta segunda atividade também foram utilizadas técnicas de regressão linear múltipla.
+
+# Atividade 1
+
+## Introdução
+Com base nos dados disponibilizados no *dataset* "stackloss" (do R base), que apresenta dados de 21 dias de operação de um indústria que realiza oxidação de amônia ($NH_3$) em ácido nítrico ($HNO_3$). O ácido nítrico produzido é absorvido na torre de absorção contracorrente. As informações disponíveis na base de dados referem-se a:  
+
+::: incrementyal
+- **Air fow**: que representa a taxa de operação da indústria (corrente de ar refrigerado);  
+- **Water Temp**: é a temperatura de resfriamento da água que circula nos canos da torre de absorção;  
+- **Acid.Conc.**: é a concentração do ácido [em porcentagem, após tratamento]; e  
+- **stack.loss** (variável dependente) é o percentual (após tratamento) de amônia introduzida no processo industrial que escapa da absorção (representando uma medida(inversa) de eficiência total da indústria).  
+:::
+
+Com base nestes dados, objetiva-se:
+
+
+1. Ajustar um modelo linear múltiplo completo para estes dados. Avaliando as estimativas dos parâmetros, os resíduos e a influência das observações no ajuste do modelo, incluindo leverage, distância de Cook, DFBETAs, DFFITs e COVRATIOs.  
+
+2. Avaliar a partir de regressão parcial e dos resíduos parciais as variáveis no modelo, bem como o pressuposto de normalidade do resíduos.
+
+## Resultados
+
+### Análise descritiva dos dados
+
+É possivel realizar uma descrição prévia dos dados por meio de medidas de resumo e de gráficos do tipo box-plot como vê-se a seguir:
+
+
+```{r tab1:MedRes}
+#| echo: false
+#| warning: false
+
+dados1|>
+  rename(
+    "Fluxo de Ar" = air_flow,
+    "Temperatura da Água" = water_temp,
+    "Concentração de HNO3" = acid_conc,
+    "Amônia Perdida" = stack_loss
+  )|>
+  summarytools::descr(
+    stats = c("min", "q1", "med", "mean","q3", "max",  "sd", "cv", "Skewness", "Kurtosis"),
+    justify = "c",
+    style = "rmarkdown",
+    transpose = T
+  )|>
+  kbl(
+    caption = "Medidas Resumo dos dados",
+    digits = 2,
+    format.args=list(big.mark=".", decimal.mark=","),
+    align = "c", 
+    row.names = T, 
+    booktabs = T
+  )|>
+  column_spec(1, bold = T)|>
+  kable_styling(
+    full_width = F,
+    position = 'center', 
+    latex_options = c("striped", "HOLD_position", "scale_down")
+  )|>
+  kable_material()
+```
+
+
+
+```{r fig3:BoxPlot2}
+#| echo: false
+#| warning: false
+#| fig-height: 4.5
+#| fig-width: 6
+
+# BoxPlot ----
+{
+## b1 volume de ar----
+b1 <- dados1|>
+  ggplot(aes(y = air_flow)) +
+  geom_boxplot(col="darkblue", fill="skyblue", alpha = 0.5)+
+  labs(
+    title = "Fluxo de Ar",
+    x = "",
+    y = "m³"
+  )+theme_minimal(base_size = 7.5)
+
+## b2 Temperatura da água ----
+b2 <- dados1|>
+  ggplot(aes(y = water_temp)) +
+  geom_boxplot(col="darkblue", fill="skyblue", alpha = 0.5)+
+  labs(
+    title = "Temperatura da Água",
+    x = "",
+    y = "ºC"
+  )+theme_minimal(base_size = 7.5)
+
+## b3 Concentração de HNO_3 ----
+b3 <- dados1|>
+  ggplot(aes(y = acid_conc)) +
+  geom_boxplot(col="darkblue", fill="skyblue", alpha = 0.5)+
+  labs(
+    title = "Concentração de HNO3",
+    x = "",
+    y = "g/L"
+  )+theme_minimal(base_size = 7.5)
+
+## b4 Perda ----
+b4 <- dados1|>
+  ggplot(aes(y = stack_loss)) +
+  geom_boxplot(col="darkblue", fill="skyblue", alpha = 0.5)+
+  labs(
+    title = "Amônia Perdida",
+    x = "",
+    y = "Porcentagem"
+  )+theme_minimal(base_size = 7.5)
+
+b1 + b2 + b3 + b4 + 
+  plot_layout(ncol = 2) + 
+  plot_annotation(
+    title = "Figura 1: BoxPlot das variáveis em análise.",
+    tag_levels = c("A", "2"))&
+   theme(
+     legend.position = "none",
+     plot.tag.position = c(1, 0),
+     plot.tag = element_text(size = 12, hjust = 1, vjust = -2.2)
+   )
+}
+
+```
+
+Nota-se uma assimetria nos dados apresentados e algumas observações que podem ser descritas como *outliers*. Entretanto é possivel propor um modelo de regressão como se segue.
+
+
+
