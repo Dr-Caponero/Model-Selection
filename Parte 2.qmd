@@ -73,12 +73,110 @@ O relatório desta semana está dividido em duas atividades. Na segunda atividad
 
 # Atividade 1
 
+## Introdução
+
+Esta atividade traz um conjunto de dados contendo informações sobre **Renda** e **Tempo** de casais com pelo menos um filho e visa determinar o efeito da renda anual do marido no tempo entre o casamento e o nascimento do primeiro filho.
+
+
+## Análise dos descritiva
+
+```{r dados_p1}
+#| echo: false
+#| warning: false
+
+# Dados ----
+dados <- readr::read_table("Lab08q01.txt")
+
+dados <- dados|>
+  janitor::clean_names()
+```
+
+
+
+```{r tab1_p1}
+#| echo: false
+#| warning: false
+
+dados|>
+  dplyr::rename("Renda" = renda, "Tempo" = tempo)|>
+  summarytools::descr(
+    stats = c("min", "q1", "med", "mean","q3", "max",  "sd", "cv", "Skewness", "Kurtosis"),
+    justify = "c",
+    style = "rmarkdown",
+    transpose = T
+  )|>
+  kableExtra::kbl(
+    caption = "Medidas Resumo dos dados",
+    digits = 2,
+    format.args=list(big.mark=".", decimal.mark=","),
+    align = "c", 
+    row.names = T, 
+    booktabs = T
+  )|>
+  kableExtra::column_spec(1, bold = T)|>
+  kableExtra::kable_styling(
+    full_width = F,
+    position = 'center', 
+    latex_options = c("striped", "HOLD_position", "scale_down")
+  )|>
+  kableExtra::kable_material()
+```
+
+
+
+```{r fig1_p1}
+#| echo: false
+#| warning: false
+#| fig-height: 5
+#| fig-width: 7
+#| fig-align: center
+
+
+dados|>
+  dplyr::rename("Renda" = renda, "Tempo" = tempo)|>
+  psych::pairs.panels(smooth = F, digits = 3, ellipses = F, 
+                      hist.col = "skyblue", rug = F, stars = T, show.points = T,
+                      main = "Figura 1: Relação entre as variáveis")
+```
+
+
+A Figura 1, composta por uma matriz de informações traz na diagonal principal o histograma de cada variável juntamente com o a densidade dos dados, possibilitando identificar mais facilmente padrões de assimetria e curtose, aparentando haver uma leve assimetria a direita para a distribuição dos dados relacionados a Renda e uma leve assimetria a esquerda referente a variável Tempo.
+A diagonal secundária traz o coeficiente de correlação entre as variáveis, sendo este com valor baixo, indicando uma fraca relação e um gráfico de dispersão dos dados com uma tentativa de ajuste do modelo sugerindo a necessidade de implementação de um modelo quadrático para melhor se adequar ao comportamento dos dados.
+
+
+
+
+
+
+
+
+```{r fig2_p1}
+#| echo: false
+#| warning: false
+#| fig-height: 5
+#| fig-width: 7
+#| fig-align: center
+
+dados|>
+  ggplot2::ggplot(mapping = aes(x = tempo, y = renda))+
+  ggplot2::geom_point()+
+  ggplot2::geom_smooth(method = "lm", formula = "y ~ x", color = "seagreen")+
+  ggplot2::labs(title = "Figura 2: Renda vs Tempo")+
+  scale_y_continuous(labels = scales::number_format(big.mark = ".",decimal.mark = ","))+
+  ggplot2::theme_bw()
+```
+
+
+Com base na Figura 2 se constata um comportamento aparentemente quadrático entre as variáveis, não sendo adequadamente descritopelo modelo de regressão linear simples, para tanto se faz necessário uma nova abordagem através da utilização do modelo polinomial para tentar obter melhor resultado.
+
+
+
 
 # Atividade 2
+
 ## Introdução
 Com base nos dados disponibilizados no *dataset* "prostate" (do pacote *faraway*), que apresenta dados referentes ao câncer de prostata de 97 pacientes, cujo objetivo foi identificar os pacientes com indicação de prostatectomia tooal. As informações disponíveis na base de dados referem-se a:  
 
-::: incrementyal
 - **lcavol**: é o volume do câncer (logarírimo);  
 - **lweight**: é o peso (massa) da próstata (logarítimo);  
 - **age**: é a idade do paciente (anos);    
@@ -88,7 +186,6 @@ Com base nos dados disponibilizados no *dataset* "prostate" (do pacote *faraway*
 - **gleason**: é o Índice de Gleason;  
 - **pgg45**: é a porcentagem do Índice de Gleason de valor 4 ou 5 (porcentagem);  
 - **lpsa**: é o valor do PSA (logarítimico);  
-:::
 
 **Fonte: Andrews, D.F.; Herzberg, A.M. (1985): Data. New York: Springer-Verlag.**
 
@@ -274,7 +371,7 @@ resultados|>
 ```
 A Tabela 2 apresenta os intervalos de confiança calculados os coeeficientes da equação acima com 95% de confiança.
 
-## Seleçâo de Modelo
+## Seleção de Modelo
 
 As seleções de modelo foram realizadas por meio do pacote `olsrr` da linguagem R.
 
