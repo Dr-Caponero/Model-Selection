@@ -96,9 +96,10 @@ dados <- dados|>
 ```{r tab1_p1}
 #| echo: false
 #| warning: false
+#| error: false
 
 dados|>
-  dplyr::rename("Renda" = renda, "Tempo" = tempo)|>
+  rename("Renda" = renda, "Tempo" = tempo)|>
   summarytools::descr(
     stats = c("min", "q1", "med", "mean","q3", "max",  "sd", "cv", "Skewness", "Kurtosis"),
     justify = "c",
@@ -124,6 +125,8 @@ dados|>
 
 
 
+
+
 ```{r fig1_p1}
 #| echo: false
 #| warning: false
@@ -144,21 +147,16 @@ A Figura 1, composta por uma matriz de informações traz na diagonal principal 
 A diagonal secundária traz o coeficiente de correlação entre as variáveis, sendo este com valor baixo, indicando uma fraca relação e um gráfico de dispersão dos dados com uma tentativa de ajuste do modelo sugerindo a necessidade de implementação de um modelo quadrático para melhor se adequar ao comportamento dos dados.
 
 
-
-
-
-
-
-
 ```{r fig2_p1}
 #| echo: false
 #| warning: false
-#| fig-height: 5
+#| fig-height: 4
 #| fig-width: 7
 #| fig-align: center
 
 dados|>
-  ggplot2::ggplot(mapping = aes(x = tempo, y = renda))+
+  dplyr::rename("Renda" = renda, "Tempo" = tempo)|>
+  ggplot2::ggplot(mapping = aes(x = Tempo, y = Renda))+
   ggplot2::geom_point()+
   ggplot2::geom_smooth(method = "lm", formula = "y ~ x", color = "seagreen")+
   ggplot2::labs(title = "Figura 2: Renda vs Tempo")+
@@ -167,7 +165,37 @@ dados|>
 ```
 
 
-Com base na Figura 2 se constata um comportamento aparentemente quadrático entre as variáveis, não sendo adequadamente descritopelo modelo de regressão linear simples, para tanto se faz necessário uma nova abordagem através da utilização do modelo polinomial para tentar obter melhor resultado.
+Com base na Figura 2 se constata um comportamento aparentemente quadrático entre as variáveis, não sendo adequadamente descrito pelo modelo de regressão linear simples, para tanto se faz necessário uma nova abordagem através da utilização do modelo polinomial para tentar obter melhor resultado.
+
+
+## Modelo Plonomial
+
+O modelo polinomial ajustado é especificado por:
+
+$$\hat{Y_i} = \beta_0 + \beta_1X_i + \beta_2X_i^2 + \beta_3X_i^3 + \epsilon_i$$
+
+
+
+```{r}
+#| echo: false
+#| warning: false
+
+mod3 = stats::lm(renda ~ stats::poly(x = tempo, degree = 3, raw = T), data = dados)
+```
+
+
+O modelo polinomial de 3ª ordem obtido é  dado por:
+
+<!-- $$\hat{Y_i} = \beta_0 + \beta_1 (`r round(mod3$coefficients[[1]])`) + \beta_2(`r round(mod3$coefficients[[2]], 3)`) + \beta_3(`r round(mod3$coefficients[[3]], 3)`) + \epsilon_i$$ -->
+
+$$\hat{Y_i} = `r round(mod3$coefficients[[1]])` + `r round(mod3$coefficients[[2]], 3)`X_i + (`r round(mod3$coefficients[[3]], 3)`)X_i^2 + `r round(mod3$coefficients[[4]], 3)`X_i^3 +\epsilon_i$$
+
+
+
+
+
+
+
 
 
 

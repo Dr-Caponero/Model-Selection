@@ -13,7 +13,36 @@ dados <- dados|>
 # Modelo Linear Simples ----
 
 # Descritiva
-psych::pairs.panels(dados)
+
+dados|>
+  dplyr::rename("Renda" = renda, "Tempo" = tempo)|>
+  summarytools::descr(
+    stats = c("min", "q1", "med", "mean","q3", "max",  "sd", "cv", "Skewness", "Kurtosis"),
+    justify = "c",
+    style = "rmarkdown",
+    transpose = T
+  )|>
+  kableExtra::kbl(
+    caption = "Medidas Resumo dos dados",
+    digits = 2,
+    format.args=list(big.mark=".", decimal.mark=","),
+    align = "c", 
+    row.names = T, 
+    booktabs = T
+  )|>
+  kableExtra::column_spec(1, bold = T)|>
+  kableExtra::kable_styling(
+    full_width = F,
+    position = 'center', 
+    latex_options = c("striped", "HOLD_position", "scale_down")
+  )|>
+  kableExtra::kable_material()
+
+dados|>
+  dplyr::rename("Renda" = renda, "Tempo" = tempo)|>
+  psych::pairs.panels(smooth = F, digits = 3, ellipses = F, 
+                      hist.col = "skyblue", rug = F, stars = T, show.points = T,
+                      main = "Figura 1: Relação entre as variáveis")
 
 
 # Modelo completo
@@ -39,11 +68,13 @@ graphics::grid(lwd = 2)
 dados|>
   ggplot2::ggplot(mapping = aes(x = tempo, y = renda))+
   ggplot2::geom_point()+
-  # ggplot2::geom_smooth(method = "lm", formula = "y~poly(x,3")+
+  ggplot2::geom_smooth(method = "lm", formula = y ~ stats::poly(x, degree = 3, raw = T))+
   ggplot2::geom_smooth(method = "lm", formula = "y ~ x", color = "seagreen")+
   ggplot2::labs(title = "Renda vs Tempo")+
   scale_y_continuous(labels = scales::number_format(big.mark = ".",decimal.mark = ","))+
   ggplot2::theme_bw()
+
+
 
 dados_tr|>
   ggplot2::ggplot(mapping = aes(x = tempo, y = renda))+
@@ -102,10 +133,21 @@ olsrr::ols_test_breusch_pagan(model = mod)
 # 2 formas de fazer:
 # Forma 1
 mod2 = stats::lm(renda ~ tempo + base::I(tempo^2), data = dados)
+mod3 = stats::lm(renda ~ tempo + base::I(tempo^2) + base::I(tempo^3), data = dados)
 
 # Forma 2
 mod3 = stats::lm(renda ~ stats::poly(x = tempo, degree = 3, raw = T), data = dados)
 
+
+mod3$coefficients[[1]]
+mod3$coefficients[[2]]
+mod3$coefficients[[3]]
+mod3$coefficients[[4]]
+
+
+anova(mod)
+anova(mod2)
+anova(mod3)
 
 summary(mod)
 summary(mod2)
